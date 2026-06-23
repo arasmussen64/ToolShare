@@ -19,8 +19,8 @@ import type {
 } from "./types";
 import { getSeedData, DEMO_USER_ID } from "./seed";
 
-const STORAGE_KEY = "toolshare_state_v3";
-const SESSION_KEY = "toolshare_user_v3";
+const STORAGE_KEY = "toolshare_state_v4";
+const SESSION_KEY = "toolshare_user_v4";
 
 interface NewToolInput {
   title: string;
