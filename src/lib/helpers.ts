@@ -77,6 +77,15 @@ export function conflictingBookings(
   );
 }
 
+/** True if a tool has pending/confirmed bookings that block deletion. */
+export function hasActiveBookings(bookings: Booking[], toolId: string): boolean {
+  return bookings.some(
+    (b) =>
+      b.toolId === toolId &&
+      (b.status === "pending" || b.status === "confirmed")
+  );
+}
+
 export const STATUS_STYLES: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 ring-amber-200",
   confirmed: "bg-emerald-100 text-emerald-800 ring-emerald-200",

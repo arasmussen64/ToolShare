@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import type { Booking, BookingStatus, CategoryId } from "@/lib/types";
+import type { Booking, BookingStatus, CategoryId, Tool } from "@/lib/types";
 import { formatCurrency, formatDate, STATUS_STYLES } from "@/lib/helpers";
 import Avatar from "@/components/Avatar";
 import ToolImage from "@/components/ToolImage";
@@ -20,9 +20,15 @@ const STATUS_TOAST: Partial<Record<BStatus, string>> = {
 };
 
 export default function ProfilePage() {
-  const { currentUser, tools, bookings, users, setBookingStatus, hydrated } =
+  const { currentUser, tools, bookings, users, setBookingStatus, deleteTool, hydrated } =
     useStore();
   const { toast } = useToast();
+
+  const handleDelete = (toolId: string) => {
+    const result = deleteTool(toolId);
+    if (result.ok) toast("Listing deleted.", "info");
+    else toast(result.reason ?? "Could not delete listing.", "error");
+  };
   const [tab, setTab] = useState<Tab>("rentals");
 
   const updateStatus = (id: string, status: BStatus) => {
@@ -216,44 +222,95 @@ export default function ProfilePage() {
               </EmptyState>
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {myListings.map((t) => {
-                  const reqs = bookings.filter(
-                    (b) => b.toolId === t.id && b.status === "pending"
-                  ).length;
-                  return (
-                    <Link
-                      key={t.id}
-                      href={`/tools/${t.id}`}
-                      className="flex gap-4 rounded-2xl border border-slate-200 bg-white p-3 transition hover:shadow-md"
-                    >
-                      <div className="h-20 w-24 shrink-0 overflow-hidden rounded-xl">
-                        <ToolImage
-                          image={t.image}
-                          category={t.category}
-                          emojiSize="text-3xl"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold text-slate-900">
-                          {t.title}
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          {formatCurrency(t.pricePerDay)}/day
-                        </p>
-                        {reqs > 0 && (
-                          <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                            {reqs} pending request{reqs > 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </div>
-                    </Link>
-                  );
-                })}
+                {myListings.map((t) => (
+                  <ListingCard
+                    key={t.id}
+                    tool={t}
+                    pendingRequests={
+                      bookings.filter(
+                        (b) => b.toolId === t.id && b.status === "pending"
+                      ).length
+                    }
+                    onDelete={() => handleDelete(t.id)}
+                  />
+                ))}
               </div>
             )}
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function ListingCard({
+  tool,
+  pendingRequests,
+  onDelete,
+}: {
+  tool: Tool;
+  pendingRequests: number;
+  onDelete: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:shadow-md">
+      <div className="flex gap-4 p-3">
+        <Link
+          href={`/tools/${tool.id}`}
+          className="h-20 w-24 shrink-0 overflow-hidden rounded-xl"
+        >
+          <ToolImage image={tool.image} category={tool.category} emojiSize="text-3xl" />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <Link href={`/tools/${tool.id}`}>
+            <p className="truncate font-semibold text-slate-900 hover:text-emerald-700">
+              {tool.title}
+            </p>
+          </Link>
+          <p className="text-sm text-slate-500">
+            {formatCurrency(tool.pricePerDay)}/day
+          </p>
+          {pendingRequests > 0 && (
+            <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+              {pendingRequests} pending request{pendingRequests > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+        {!confirming && (
+          <button
+            onClick={() => setConfirming(true)}
+            aria-label={`Delete ${tool.title}`}
+            className="self-start rounded-lg px-2 py-1 text-sm text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+          >
+            🗑️
+          </button>
+        )}
+      </div>
+
+      {confirming && (
+        <div className="flex items-center justify-between gap-3 border-t border-rose-100 bg-rose-50 px-3 py-2.5">
+          <span className="text-sm text-rose-800">Delete this listing?</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirming(false)}
+              className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                onDelete();
+                setConfirming(false);
+              }}
+              className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-700"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

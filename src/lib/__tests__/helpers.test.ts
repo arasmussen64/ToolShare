@@ -4,6 +4,7 @@ import {
   bookingTotal,
   conflictingBookings,
   formatCurrency,
+  hasActiveBookings,
   rangesOverlap,
   reviewStats,
 } from "../helpers";
@@ -83,6 +84,40 @@ describe("conflictingBookings", () => {
   it("honors the ignoreId parameter", () => {
     const bookings = [base({ id: "b1" })];
     expect(conflictingBookings(bookings, "t1", "2026-07-05", "2026-07-07", "b1")).toHaveLength(0);
+  });
+});
+
+describe("hasActiveBookings", () => {
+  const base = (over: Partial<Booking>): Booking => ({
+    id: "b",
+    toolId: "t1",
+    renterId: "u1",
+    ownerId: "u2",
+    startDate: "2026-07-04",
+    endDate: "2026-07-06",
+    days: 3,
+    totalPrice: 100,
+    status: "confirmed",
+    createdAt: "2026-06-01T00:00:00.000Z",
+    ...over,
+  });
+
+  it("is true when a pending or confirmed booking exists for the tool", () => {
+    expect(hasActiveBookings([base({ status: "pending" })], "t1")).toBe(true);
+    expect(hasActiveBookings([base({ status: "confirmed" })], "t1")).toBe(true);
+  });
+
+  it("is false when only inactive bookings exist", () => {
+    expect(
+      hasActiveBookings(
+        [base({ status: "completed" }), base({ status: "cancelled" }), base({ status: "declined" })],
+        "t1"
+      )
+    ).toBe(false);
+  });
+
+  it("is false for a different tool", () => {
+    expect(hasActiveBookings([base({ toolId: "t2", status: "confirmed" })], "t1")).toBe(false);
   });
 });
 

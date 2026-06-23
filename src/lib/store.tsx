@@ -18,7 +18,7 @@ import type {
   User,
 } from "./types";
 import { getSeedData, DEMO_USER_ID } from "./seed";
-import { bookingDays, conflictingBookings } from "./helpers";
+import { bookingDays, conflictingBookings, hasActiveBookings } from "./helpers";
 
 const STORAGE_KEY = "toolshare_state_v4";
 const SESSION_KEY = "toolshare_user_v4";
@@ -57,6 +57,7 @@ interface StoreContextValue extends AppData {
   logout: () => void;
   createAccount: (name: string, email: string, location: string) => User;
   addTool: (input: NewToolInput) => Tool | null;
+  deleteTool: (toolId: string) => { ok: boolean; reason?: string };
   requestBooking: (input: NewBookingInput) => Booking | null;
   setBookingStatus: (bookingId: string, status: BookingStatus) => void;
   addReview: (toolId: string, rating: number, comment: string) => void;
@@ -180,6 +181,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [currentUserId]
   );
 
+  const deleteTool = useCallback(
+    (toolId: string): { ok: boolean; reason?: string } => {
+      if (!currentUserId) return { ok: false, reason: "You're signed out." };
+      const tool = data.tools.find((t) => t.id === toolId);
+      if (!tool) return { ok: false, reason: "Listing not found." };
+      if (tool.ownerId !== currentUserId) {
+        return { ok: false, reason: "You can only delete your own listings." };
+      }
+      if (hasActiveBookings(data.bookings, toolId)) {
+        return {
+          ok: false,
+          reason:
+            "This listing has active bookings. Cancel or complete them first.",
+        };
+      }
+      // Remove the tool and its now-orphaned reviews. Historical bookings are
+      // kept for both parties' records (they render as a removed listing).
+      setData((d) => ({
+        ...d,
+        tools: d.tools.filter((t) => t.id !== toolId),
+        reviews: d.reviews.filter((r) => r.toolId !== toolId),
+      }));
+      return { ok: true };
+    },
+    [currentUserId, data.tools, data.bookings]
+  );
+
   const requestBooking = useCallback(
     (input: NewBookingInput): Booking | null => {
       if (!currentUserId) return null;
@@ -263,6 +291,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     logout,
     createAccount,
     addTool,
+    deleteTool,
     requestBooking,
     setBookingStatus,
     addReview,
