@@ -18,9 +18,20 @@ import type {
   User,
 } from "./types";
 import { getSeedData, DEMO_USER_ID } from "./seed";
+import { bookingDays, conflictingBookings } from "./helpers";
 
 const STORAGE_KEY = "toolshare_state_v4";
 const SESSION_KEY = "toolshare_user_v4";
+
+// Older schema versions we proactively clean up to reclaim quota.
+const STALE_KEYS = [
+  "toolshare_state_v1",
+  "toolshare_state_v2",
+  "toolshare_state_v3",
+  "toolshare_user_v1",
+  "toolshare_user_v2",
+  "toolshare_user_v3",
+];
 
 interface NewToolInput {
   title: string;
@@ -74,11 +85,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const didHydrate = useRef(false);
 
-  // Load persisted state from localStorage after mount.
+  // Load persisted state from localStorage after mount. Hydrating React state
+  // from an external store post-mount is the intended use of an effect — the
+  // first render must match the server (which has no localStorage), so this
+  // cannot move into a useState initializer.
   useEffect(() => {
     if (didHydrate.current) return;
     didHydrate.current = true;
+    /* eslint-disable react-hooks/set-state-in-effect */
     try {
+      STALE_KEYS.forEach((k) => localStorage.removeItem(k));
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as AppData;
@@ -92,6 +108,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       // Ignore corrupt storage and fall back to the seed.
     }
     setHydrated(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   // Persist whenever data changes (after hydration so we don't clobber storage).
@@ -99,8 +116,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!hydrated) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch {
-      /* storage full or unavailable */
+    } catch (err) {
+      // Most likely QuotaExceededError from large uploaded images.
+      console.warn("ToolShare: could not persist state to localStorage.", err);
     }
   }, [data, hydrated]);
 
@@ -167,10 +185,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!currentUserId) return null;
       const tool = data.tools.find((t) => t.id === input.toolId);
       if (!tool) return null;
-      const start = new Date(input.startDate);
-      const end = new Date(input.endDate);
-      const days =
-        Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+      // Owners cannot rent their own tool.
+      if (tool.ownerId === currentUserId) return null;
+      const days = bookingDays(input.startDate, input.endDate);
+      if (days <= 0) return null;
+      // Enforce availability in the mutation layer, not just the UI.
+      if (
+        conflictingBookings(data.bookings, tool.id, input.startDate, input.endDate)
+          .length > 0
+      ) {
+        return null;
+      }
       const booking: Booking = {
         id: uid("b"),
         toolId: tool.id,
@@ -186,7 +211,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setData((d) => ({ ...d, bookings: [booking, ...d.bookings] }));
       return booking;
     },
-    [currentUserId, data.tools]
+    [currentUserId, data.tools, data.bookings]
   );
 
   const setBookingStatus = useCallback(

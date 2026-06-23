@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🛠️ ToolShare
 
-## Getting Started
+A peer-to-peer marketplace for renting tools and equipment from your neighbors —
+everything from a cordless drill to a full-size backhoe. Why buy a tool you'll
+use once? Borrow what you need, and earn from the gear sitting idle in your
+garage or yard.
 
-First, run the development server:
+> **MVP / demo:** ToolShare is fully self-contained. All data is mock and seeded,
+> persisted in the browser via `localStorage`. There is no backend, database, or
+> external API call at runtime.
+
+## Features
+
+- **Browse & search** — full-text search, category filters (automotive,
+  landscaping, power/hand tools, construction, heavy equipment, and more), and
+  price sorting.
+- **Listings** — detail pages with photos/owner info, condition, location, and
+  reviews.
+- **Booking** — date-range picker with **availability conflict detection**,
+  inclusive day/price calculation, and an owner approval flow.
+- **List a tool** — create a listing with an uploaded photo (auto-downscaled and
+  compressed client-side) or a category icon.
+- **Accounts** — mock auth: pick a seed persona or create your own.
+- **Dashboard** — manage your rentals, incoming requests (confirm/decline/
+  complete), and your own listings.
+- **Reviews & ratings** — per-listing star ratings with aggregated averages.
+
+## Tech stack
+
+- [Next.js 16](https://nextjs.org) (App Router, Turbopack) + React 19
+- TypeScript (strict)
+- Tailwind CSS v4
+- Vitest for unit tests
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). Sign in as **Demo User**
+(it ships with sample rentals) to explore the full flow.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command              | Description                               |
+| -------------------- | ----------------------------------------- |
+| `npm run dev`        | Start the dev server                      |
+| `npm run build`      | Production build                          |
+| `npm start`          | Serve the production build                |
+| `npm run lint`       | ESLint                                    |
+| `npm run typecheck`  | TypeScript type checking (`tsc --noEmit`) |
+| `npm test`           | Run the Vitest unit suite                 |
+| `npm run test:watch` | Watch-mode tests                          |
 
-## Learn More
+## Architecture
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/                 # App Router pages (browse, tools/[id], list, login, profile)
+│   ├── error.tsx        # Global error boundary
+│   ├── not-found.tsx    # 404
+│   └── providers.tsx    # Toast + Store context providers
+├── components/          # UI components (Header, ToolCard, BookingWidget, …)
+└── lib/
+    ├── types.ts         # Domain types
+    ├── seed.ts          # Mock seed data (users, tools, reviews, bookings)
+    ├── store.tsx        # Client store (React Context) + localStorage persistence
+    ├── helpers.ts       # Pure logic: booking math, availability, formatting
+    ├── image.ts         # Client-side image downscale/compress
+    └── __tests__/       # Vitest unit tests for the core logic
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**State** lives in a single React Context (`StoreProvider`) seeded
+deterministically (so server and first client render match), then hydrated from
+`localStorage` after mount. Booking availability is enforced in the store
+mutation layer — not just the UI — so invalid bookings can't be written.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Continuous integration
 
-## Deploy on Vercel
+Every push and PR to `main` runs typecheck → lint → tests → production build via
+GitHub Actions (`.github/workflows/ci.yml`).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Resetting demo data
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The app keys its storage by schema version and cleans up older versions
+automatically. To wipe everything manually, clear `localStorage` for the site.

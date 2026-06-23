@@ -22,8 +22,9 @@ export default function ToolImage({
   const isPhoto = image.startsWith("data:") || image.startsWith("http");
 
   if (isPhoto) {
-    // eslint-disable-next-line @next/next/no-img-element
     return (
+      // Data-URL/user-uploaded images intentionally bypass next/image.
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={image}
         alt=""

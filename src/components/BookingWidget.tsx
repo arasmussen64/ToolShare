@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Tool } from "@/lib/types";
 import { useStore } from "@/lib/store";
+import { useToast } from "@/components/Toast";
 import {
+  bookingDays,
   conflictingBookings,
   formatCurrency,
   formatDate,
@@ -14,6 +16,7 @@ import {
 
 export default function BookingWidget({ tool }: { tool: Tool }) {
   const { currentUser, bookings, requestBooking } = useStore();
+  const { toast } = useToast();
   const router = useRouter();
 
   const today = todayISO();
@@ -43,18 +46,22 @@ export default function BookingWidget({ tool }: { tool: Tool }) {
     [bookings, tool.id, start, end, validRange]
   );
 
-  const days = useMemo(() => {
-    if (!validRange) return 0;
-    const ms = new Date(end).getTime() - new Date(start).getTime();
-    return Math.round(ms / 86400000) + 1;
-  }, [start, end, validRange]);
+  const days = useMemo(
+    () => (validRange ? bookingDays(start, end) : 0),
+    [start, end, validRange]
+  );
 
   const total = days * tool.pricePerDay;
 
   function handleSubmit() {
     if (!currentUser || !validRange || conflicts.length > 0) return;
     const booking = requestBooking({ toolId: tool.id, startDate: start, endDate: end });
-    if (booking) setDone({ days: booking.days, total: booking.totalPrice });
+    if (booking) {
+      setDone({ days: booking.days, total: booking.totalPrice });
+    } else {
+      // The store rejected it (e.g. a booking landed first). Keep the user informed.
+      toast("Those dates are no longer available — please pick another range.", "error");
+    }
   }
 
   if (done) {

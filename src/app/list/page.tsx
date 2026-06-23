@@ -8,6 +8,7 @@ import { CATEGORIES, categoryOf } from "@/lib/categories";
 import type { CategoryId, Tool } from "@/lib/types";
 import ToolImage from "@/components/ToolImage";
 import { useToast } from "@/components/Toast";
+import { processImageFile } from "@/lib/image";
 
 const CONDITIONS: Tool["condition"][] = ["New", "Like New", "Good", "Fair"];
 
@@ -25,12 +26,20 @@ export default function ListToolPage() {
   const [condition, setCondition] = useState<Tool["condition"]>("Good");
   const [photo, setPhoto] = useState<string>("");
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  const [processing, setProcessing] = useState(false);
+
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setPhoto(typeof reader.result === "string" ? reader.result : "");
-    reader.readAsDataURL(file);
+    setProcessing(true);
+    try {
+      setPhoto(await processImageFile(file));
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't process that image.", "error");
+    } finally {
+      setProcessing(false);
+      e.target.value = ""; // allow re-selecting the same file
+    }
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -170,11 +179,16 @@ export default function ListToolPage() {
             <ToolImage image={photo} category={category} />
           </div>
           <label className="mt-3 block cursor-pointer rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-center text-sm text-slate-500 hover:border-emerald-400 hover:text-emerald-600">
-            {photo ? "Change photo" : "📷 Upload a photo (optional)"}
+            {processing
+              ? "Processing…"
+              : photo
+                ? "Change photo"
+                : "📷 Upload a photo (optional)"}
             <input
               type="file"
               accept="image/*"
               onChange={handlePhoto}
+              disabled={processing}
               className="hidden"
             />
           </label>

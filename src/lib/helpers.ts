@@ -14,8 +14,34 @@ export function formatDate(iso: string): string {
   });
 }
 
+/** Local-date "today" as yyyy-mm-dd (avoids the UTC off-by-one of toISOString). */
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Parse a yyyy-mm-dd string to a UTC epoch (DST-safe for day arithmetic). */
+function dateToUTC(d: string): number {
+  const [y, m, day] = d.split("-").map(Number);
+  return Date.UTC(y, (m ?? 1) - 1, day ?? 1);
+}
+
+/** Inclusive number of rental days between two yyyy-mm-dd dates (0 if invalid). */
+export function bookingDays(start: string, end: string): number {
+  const ms = dateToUTC(end) - dateToUTC(start);
+  if (Number.isNaN(ms) || ms < 0) return 0;
+  return Math.round(ms / 86400000) + 1;
+}
+
+export function bookingTotal(
+  pricePerDay: number,
+  start: string,
+  end: string
+): number {
+  return bookingDays(start, end) * pricePerDay;
 }
 
 export function reviewStats(reviews: Review[], toolId: string) {
